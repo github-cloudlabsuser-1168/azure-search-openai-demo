@@ -1,4 +1,5 @@
 import os
+
 from abc import ABC
 from dataclasses import dataclass
 from typing import (
@@ -30,6 +31,8 @@ from text import nonewlines
 
 @dataclass
 class Document:
+    """Represents a document with its properties and metadata."""
+
     id: Optional[str]
     content: Optional[str]
     embedding: Optional[List[float]]
@@ -44,6 +47,7 @@ class Document:
     reranker_score: Optional[float] = None
 
     def serialize_for_results(self) -> dict[str, Any]:
+        """Serializes the document object into a dictionary for results."""
         return {
             "id": self.id,
             "content": self.content,
@@ -85,12 +89,16 @@ class Document:
 
 @dataclass
 class ThoughtStep:
+    """Represents a thought step with its title, description, and properties."""
+
     title: str
     description: Optional[Any]
     props: Optional[dict[str, Any]] = None
 
 
 class Approach(ABC):
+    """Abstract base class for different approaches."""
+
     def __init__(
         self,
         search_client: SearchClient,
@@ -118,6 +126,7 @@ class Approach(ABC):
         self.vision_token_provider = vision_token_provider
 
     def build_filter(self, overrides: dict[str, Any], auth_claims: dict[str, Any]) -> Optional[str]:
+        """Builds the filter based on the overrides and authentication claims."""
         exclude_category = overrides.get("exclude_category")
         security_filter = self.auth_helper.build_security_filters(overrides, auth_claims)
         filters = []
@@ -138,6 +147,7 @@ class Approach(ABC):
         minimum_search_score: Optional[float],
         minimum_reranker_score: Optional[float],
     ) -> List[Document]:
+        """Performs a search based on the provided parameters and returns a list of documents."""
         # Use semantic ranker if requested and if retrieval mode is text or hybrid (vectors + text)
         if use_semantic_ranker and query_text:
             results = await self.search_client.search(
@@ -190,6 +200,7 @@ class Approach(ABC):
     def get_sources_content(
         self, results: List[Document], use_semantic_captions: bool, use_image_citation: bool
     ) -> list[str]:
+        """Returns the content of the sources based on the search results."""
         if use_semantic_captions:
             return [
                 (self.get_citation((doc.sourcepage or ""), use_image_citation))
@@ -204,6 +215,7 @@ class Approach(ABC):
             ]
 
     def get_citation(self, sourcepage: str, use_image_citation: bool) -> str:
+        """Returns the citation for a source page."""
         if use_image_citation:
             return sourcepage
         else:
@@ -216,6 +228,7 @@ class Approach(ABC):
             return sourcepage
 
     async def compute_text_embedding(self, q: str):
+        """Computes the text embedding for a given query."""
         SUPPORTED_DIMENSIONS_MODEL = {
             "text-embedding-ada-002": False,
             "text-embedding-3-small": True,
@@ -238,6 +251,7 @@ class Approach(ABC):
         return VectorizedQuery(vector=query_vector, k_nearest_neighbors=50, fields="embedding")
 
     async def compute_image_embedding(self, q: str):
+        """Computes the image embedding for a given query."""
         endpoint = urljoin(self.vision_endpoint, "computervision/retrieval:vectorizeText")
         headers = {"Content-Type": "application/json"}
         params = {"api-version": "2023-02-01-preview", "modelVersion": "latest"}
@@ -254,6 +268,27 @@ class Approach(ABC):
         return VectorizedQuery(vector=image_query_vector, k_nearest_neighbors=50, fields="imageEmbedding")
 
     async def run(
+        self,
+        top: int,
+        query_text: Optional[str],
+        filter: Optional[str],
+        vectors: List[VectorQuery],
+        use_semantic_ranker: bool,
+        use_semantic_captions: bool,
+        minimum_search_score: Optional[float],
+        minimum_reranker_score: Optional[float],
+    ) -> List[Document]:
+        """Runs the approach with the provided parameters and returns a list of documents."""
+        return await self.search(
+            top=top,
+            query_text=query_text,
+            filter=filter,
+            vectors=vectors,
+            use_semantic_ranker=use_semantic_ranker,
+            use_semantic_captions=use_semantic_captions,
+            minimum_search_score=minimum_search_score,
+            minimum_reranker_score=minimum_reranker_score,
+        )
         self, messages: list[dict], stream: bool = False, session_state: Any = None, context: dict[str, Any] = {}
     ) -> Union[dict[str, Any], AsyncGenerator[dict[str, Any], None]]:
         raise NotImplementedError
